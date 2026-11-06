@@ -1,22 +1,27 @@
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/kprobes.h>
+name: build-lkm-ddk
 
-static int __init test_init(void) {
-    struct kprobe kp = {
-        .symbol_name = "kallsyms_lookup_name"
-    };
-    register_kprobe(&kp);
-    unregister_kprobe(&kp);
-    
-    pr_info("CAK_TEST: Module loaded. kallsyms at %px\n", kp.addr);
-    return 0;
-}
+on:
+  workflow_dispatch:
 
-static void __exit test_exit(void) {
-    pr_info("CAK_TEST: Module unloaded.\n");
-}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-module_init(test_init);
-module_exit(test_exit);
-MODULE_LICENSE("GPL");
+      - name: Setup DDK
+        run: |
+          # 下载原作者预编译好的DDK环境（保证能直接编译）
+          git clone --depth=1 https://github.com/inforcqb/ddk.git /tmp/ddk
+          
+      - name: Build module
+        run: |
+          export DDK_PATH=/tmp/ddk/android15-6.6
+          make -C $DDK_PATH M=$PWD/kernel ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 modules
+
+      - name: Upload ko
+        uses: actions/upload-artifact@v4
+        with:
+          name: CAK_Test_Module
+          path: kernel/*.ko
