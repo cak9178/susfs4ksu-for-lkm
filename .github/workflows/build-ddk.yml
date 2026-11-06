@@ -7,18 +7,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Module
         uses: actions/checkout@v4
 
-      - name: Setup DDK
+      - name: Install Dependencies
         run: |
-          # 下载原作者预编译好的DDK环境（保证能直接编译）
-          git clone --depth=1 https://github.com/inforcqb/ddk.git /tmp/ddk
-          
-      - name: Build module
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential flex libssl-dev libelf-dev clang lld llvm
+
+      - name: Clone GKI Kernel (6.6)
         run: |
-          export DDK_PATH=/tmp/ddk/android15-6.6
-          make -C $DDK_PATH M=$PWD/kernel ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 modules
+          # 直接拉取 Android 官方 6.6 内核源码
+          git clone --depth=1 -b android15-6.6 https://android.googlesource.com/kernel/common gki-kernel
+
+      - name: Build Module
+        run: |
+          # 编译外部模块
+          make -C gki-kernel ARCH=arm64 CC=clang LLVM=1 O=$(pwd)/gki-out gki_defconfig
+          make -C gki-kernel ARCH=arm64 CC=clang LLVM=1 O=$(pwd)/gki-out M=$(pwd)/kernel modules
 
       - name: Upload ko
         uses: actions/upload-artifact@v4
